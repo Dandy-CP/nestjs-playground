@@ -2,14 +2,12 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
-  NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Users } from './entity/users.entity';
 import { CreateUserDTO } from './DTO/createUser.dto';
-import { LoginUsersDTO } from './DTO/loginUser.DTO';
 
 @Injectable()
 export class UsersService {
@@ -18,39 +16,9 @@ export class UsersService {
     private readonly usersRepository: Repository<Users>,
   ) {}
 
-  async loginUsers(payload: LoginUsersDTO): Promise<Users | any> {
-    const { email, password } = payload;
-
-    const UserInDB = await this.usersRepository
-      .createQueryBuilder('users')
-      .where('users.email = :email', { email })
-      .getOne();
-
-    if (UserInDB === null) {
-      throw new NotFoundException(`Email ${email} tidak di temukan atau salah`);
-    }
-
-    if (UserInDB !== null) {
-      const passwordValidation = await bcrypt.compare(
-        password,
-        UserInDB.password,
-      );
-
-      if (passwordValidation) {
-        return {
-          message: 'Login Success',
-        };
-      }
-
-      if (!passwordValidation) {
-        return {
-          message: 'Wrong Password',
-        };
-      }
-    }
-  }
-
-  async registerNewUsers(payload: CreateUserDTO): Promise<Users | any> {
+  async registerNewUsers(
+    payload: CreateUserDTO,
+  ): Promise<{ message: string } | CreateUserDTO> {
     const { name, email, password } = payload;
     const saltValue = await bcrypt.genSalt();
 
@@ -75,7 +43,20 @@ export class UsersService {
       });
 
     return {
-      message: 'user created',
+      message: 'Success Signup',
+      name: name,
+      email: email,
     };
+  }
+
+  async validateUser(email: string, password: string): Promise<Users> {
+    const UserInDB = await this.usersRepository
+      .createQueryBuilder('users')
+      .where('users.email = :email', { email })
+      .getOne();
+
+    if (UserInDB && (await UserInDB.validatePassword(password))) {
+      return UserInDB;
+    }
   }
 }
