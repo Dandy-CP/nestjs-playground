@@ -2,12 +2,17 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  NotFoundException,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { ILike, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
 import { Users } from './entity/users.entity';
 import { CreateUserDTO } from './DTO/createUser.dto';
+import { FilterUsers } from './DTO/filterUsers.DTO';
+import { UpdateUserDTO } from './DTO/updateUsers.DTO';
+import { ChangePasswordUserDTO } from './DTO/changePassword.DTO';
 
 @Injectable()
 export class UsersService {
@@ -16,11 +21,41 @@ export class UsersService {
     private readonly usersRepository: Repository<Users>,
   ) {}
 
+  async getUsers(
+    params: FilterUsers,
+  ): Promise<Users[] | Users | { data: Users } | { data: Users[] }> {
+    const { id, name } = params;
+
+    if (id) {
+      return {
+        data: await this.usersRepository
+          .createQueryBuilder('users')
+          .where('users.id = :id', { id })
+          .getOne(),
+      };
+    }
+
+    if (name) {
+      return {
+        data: await this.usersRepository
+          .createQueryBuilder('users')
+          .where({ name: ILike(`%${name}%`) })
+          .getMany(),
+      };
+    }
+
+    return await this.usersRepository.createQueryBuilder('users').getMany();
+  }
+
   async registerNewUsers(
     payload: CreateUserDTO,
   ): Promise<{ message: string } | CreateUserDTO> {
-    const { name, email, password } = payload;
+    const { name, email, password, role } = payload;
     const saltValue = await bcrypt.genSalt();
+
+    if (role !== 'Employee' && role !== 'Admin') {
+      throw new ConflictException(`Role ${role} is not Allowed`);
+    }
 
     await this.usersRepository
       .createQueryBuilder()
@@ -29,6 +64,7 @@ export class UsersService {
       .values({
         name: name,
         email: email,
+        role: role,
         password: await bcrypt.hash(password, saltValue),
         salt: saltValue,
         isVerified: false,
@@ -58,5 +94,93 @@ export class UsersService {
     if (UserInDB && (await UserInDB.validatePassword(password))) {
       return UserInDB;
     }
+  }
+
+  async findUserByID(id: string): Promise<Users> {
+    const UserInDB = await this.usersRepository
+      .createQueryBuilder('users')
+      .where('users.id = :id', { id })
+      .getOne();
+
+    if (!UserInDB) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    return UserInDB;
+  }
+
+  async deleteUser(id: string): Promise<{ message: string }> {
+    const excuteDelete = await this.usersRepository
+      .createQueryBuilder('users')
+      .delete()
+      .from(Users)
+      .where('users.id = :id', { id })
+      .execute();
+
+    if (excuteDelete.affected === 0) {
+      throw new NotFoundException(
+        `User with ID ${id} not found or maybe deleted`,
+      );
+    }
+
+    return {
+      message: `user with id ${id} success deleted`,
+    };
+  }
+
+  async updateUser(
+    id: string,
+    payload: UpdateUserDTO,
+  ): Promise<{ message: string; value: UpdateUserDTO }> {
+    const excuteUpdate = await this.usersRepository
+      .createQueryBuilder('users')
+      .update(Users)
+      .set(payload)
+      .where('users.id = :id', { id })
+      .execute();
+
+    if (excuteUpdate.affected === 0) {
+      throw new NotFoundException(
+        `User with ID ${id} not found or maybe deleted`,
+      );
+    }
+
+    return {
+      message: `user with id ${id} success updated`,
+      value: payload,
+    };
+  }
+
+  async changePassword(
+    id: string,
+    payload: ChangePasswordUserDTO,
+  ): Promise<{ message: string }> {
+    const { old_password, new_password } = payload;
+
+    const UserInDB = await this.findUserByID(id);
+    const checkPassword = await UserInDB.validatePassword(old_password);
+
+    if (checkPassword) {
+      const excuteChangePassword = await this.usersRepository
+        .createQueryBuilder('users')
+        .update(Users)
+        .set({
+          password: await bcrypt.hash(new_password, UserInDB.salt),
+        })
+        .where('users.id = :id', { id })
+        .execute();
+
+      if (excuteChangePassword.affected === 0) {
+        throw new NotFoundException(
+          `User with ID ${id} not found or maybe deleted`,
+        );
+      }
+    } else if (!checkPassword) {
+      throw new UnauthorizedException('Wrong old password');
+    }
+
+    return {
+      message: `user with id ${id} success change password`,
+    };
   }
 }

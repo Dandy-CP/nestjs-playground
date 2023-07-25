@@ -9,6 +9,9 @@ export class CreateUserDTO {
   email: string;
 
   @IsNotEmpty()
+  role: string;
+
+  @IsNotEmpty()
   @MinLength(8)
   password: string;
 }

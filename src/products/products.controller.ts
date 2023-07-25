@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Delete,
+  UseGuards,
   // UsePipes,
   // ValidationPipe,
 } from '@nestjs/common';
@@ -15,8 +16,10 @@ import { CreateProductDTO } from './DTO/createProduct.DTO';
 import { UpdateProductDTO } from './DTO/updateProduct.DTO';
 import { FilterProductDTO } from './DTO/filterProducts.DTO';
 import { UUIDValidation } from 'src/pipes/uuid-validation.pipe';
+import { JWTGuard } from 'guard/JWT.guard';
 
 @Controller('products')
+@UseGuards(JWTGuard)
 export class ProductsController {
   constructor(private productService: ProductsService) {}
 

@@ -4,7 +4,7 @@ import { UpdateProductDTO } from './DTO/updateProduct.DTO';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Product } from './entity/product.entity';
 import { FilterProductDTO } from './DTO/filterProducts.DTO';
-import { Repository } from 'typeorm';
+import { Repository, ILike } from 'typeorm';
 
 @Injectable()
 export class ProductsService {
@@ -20,11 +20,11 @@ export class ProductsService {
       return {
         totalProducts: await this.productRepository
           .createQueryBuilder('product')
-          .where('product.productName = :productName', { productName })
+          .where({ productName: ILike(`%${productName}%`) })
           .getCount(),
         value: await this.productRepository
           .createQueryBuilder('product')
-          .where('product.productName = :productName', { productName })
+          .where({ productName: ILike(`%${productName}%`) })
           .getMany(),
       };
     }
@@ -33,11 +33,11 @@ export class ProductsService {
       return {
         totalProducts: await this.productRepository
           .createQueryBuilder('product')
-          .where('product.category = :category', { category })
+          .where({ category: ILike(`%${category}%`) })
           .getCount(),
         value: await this.productRepository
           .createQueryBuilder('product')
-          .where('product.category = :category', { category })
+          .where({ category: ILike(`%${category}%`) })
           .getMany(),
       };
     }
