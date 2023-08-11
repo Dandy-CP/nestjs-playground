@@ -9,16 +9,20 @@ import {
   Query,
   UseGuards,
   UnauthorizedException,
+  DefaultValuePipe,
+  ParseIntPipe,
 } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { CreateUserDTO } from './DTO/createUser.dto';
-import { Users } from './entity/users.entity';
-import { FilterUsers } from './DTO/filterUsers.DTO';
+import { Pagination } from 'nestjs-typeorm-paginate';
 import { JWTGuard } from 'guard/JWT.guard';
 import { UUIDValidation } from 'src/pipes/uuid-validation.pipe';
+import { GetUser } from 'src/auth/user.decorator';
+import { UsersService } from './users.service';
+import { Users } from './entity/users.entity';
+
+import { CreateUserDTO } from './DTO/createUser.dto';
+import { FilterUsers } from './DTO/filterUsers.DTO';
 import { UpdateUserDTO } from './DTO/updateUsers.DTO';
 import { ChangePasswordUserDTO } from './DTO/changePassword.DTO';
-import { GetUser } from 'src/auth/user.decorator';
 
 @Controller('user')
 export class UsersController {
@@ -29,9 +33,16 @@ export class UsersController {
   async getAllUsers(
     @Query() params: FilterUsers,
     @GetUser() logedInUser: Users,
-  ): Promise<Users[] | Users | { data: Users } | { data: Users[] }> {
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+  ): Promise<Pagination<Users>> {
+    limit = limit > 100 ? 100 : limit;
+
     if (logedInUser.role === 'Admin') {
-      return this.userService.getUsers(params);
+      return this.userService.getUsers(params, {
+        page,
+        limit,
+      });
     } else {
       throw new UnauthorizedException('Only Admin can access this route');
     }

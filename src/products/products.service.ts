@@ -1,10 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Repository, ILike } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import {
+  paginate,
+  Pagination,
+  IPaginationOptions,
+} from 'nestjs-typeorm-paginate';
+
+import { Product } from './entity/product.entity';
+
 import { CreateProductDTO } from './DTO/createProduct.DTO';
 import { UpdateProductDTO } from './DTO/updateProduct.DTO';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Product } from './entity/product.entity';
 import { FilterProductDTO } from './DTO/filterProducts.DTO';
-import { Repository, ILike } from 'typeorm';
 
 @Injectable()
 export class ProductsService {
@@ -13,43 +20,25 @@ export class ProductsService {
     private readonly productRepository: Repository<Product>,
   ) {}
 
-  async getProducts(params: FilterProductDTO): Promise<Product[] | any> {
+  async getProducts(
+    params: FilterProductDTO,
+    options: IPaginationOptions,
+  ): Promise<Pagination<Product>> {
     const { productName, category } = params;
+    const queryBuilder = this.productRepository.createQueryBuilder('product');
 
     if (productName) {
-      return {
-        totalProducts: await this.productRepository
-          .createQueryBuilder('product')
-          .where({ productName: ILike(`%${productName}%`) })
-          .getCount(),
-        value: await this.productRepository
-          .createQueryBuilder('product')
-          .where({ productName: ILike(`%${productName}%`) })
-          .getMany(),
-      };
+      queryBuilder.where({ productName: ILike(`%${productName}%`) }).getMany();
+      return await paginate<Product>(queryBuilder, options);
     }
 
     if (category) {
-      return {
-        totalProducts: await this.productRepository
-          .createQueryBuilder('product')
-          .where({ category: ILike(`%${category}%`) })
-          .getCount(),
-        value: await this.productRepository
-          .createQueryBuilder('product')
-          .where({ category: ILike(`%${category}%`) })
-          .getMany(),
-      };
+      queryBuilder.where({ category: ILike(`%${category}%`) }).getMany();
+      return await paginate<Product>(queryBuilder, options);
     }
 
-    return {
-      totalProducts: await this.productRepository
-        .createQueryBuilder('product')
-        .getCount(),
-      value: await this.productRepository
-        .createQueryBuilder('product')
-        .getMany(),
-    };
+    queryBuilder.getMany();
+    return await paginate<Product>(queryBuilder, options);
   }
 
   async getProductById(id: string): Promise<Product[] | any> {

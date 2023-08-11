@@ -8,7 +8,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import * as bcrypt from 'bcrypt';
+import {
+  paginate,
+  Pagination,
+  IPaginationOptions,
+} from 'nestjs-typeorm-paginate';
+
 import { Users } from './entity/users.entity';
+
 import { CreateUserDTO } from './DTO/createUser.dto';
 import { FilterUsers } from './DTO/filterUsers.DTO';
 import { UpdateUserDTO } from './DTO/updateUsers.DTO';
@@ -23,28 +30,23 @@ export class UsersService {
 
   async getUsers(
     params: FilterUsers,
-  ): Promise<Users[] | Users | { data: Users } | { data: Users[] }> {
+    options: IPaginationOptions,
+  ): Promise<Pagination<Users>> {
     const { id, name } = params;
+    const queryBuilder = this.usersRepository.createQueryBuilder('users');
 
     if (id) {
-      return {
-        data: await this.usersRepository
-          .createQueryBuilder('users')
-          .where('users.id = :id', { id })
-          .getOne(),
-      };
+      queryBuilder.where('users.id = :id', { id }).getOne();
+      return await paginate<Users>(queryBuilder, options);
     }
 
     if (name) {
-      return {
-        data: await this.usersRepository
-          .createQueryBuilder('users')
-          .where({ name: ILike(`%${name}%`) })
-          .getMany(),
-      };
+      queryBuilder.where({ name: ILike(`%${name}%`) }).getMany();
+      return await paginate<Users>(queryBuilder, options);
     }
 
-    return await this.usersRepository.createQueryBuilder('users').getMany();
+    queryBuilder.getMany();
+    return await paginate<Users>(queryBuilder, options);
   }
 
   async registerNewUsers(
